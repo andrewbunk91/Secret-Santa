@@ -1,0 +1,18 @@
+{
+  "name": "secret-santa",
+  "version": "1.0.0",
+  "description": "Secret Santa draw with a persistent backend.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --check server.js"
+  },
+  "keywords": [
+    "secret-santa",
+    "holiday",
+    "draw"
+  ],
+  "author": "",
+  "license": "ISC"
+}
