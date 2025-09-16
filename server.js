@@ -272,6 +272,8 @@ function normalizeState(rawState) {
 
 async function serveHtml(res) {
   try {
+    // === Need to serve a different HTML version? Update the filename below. ===
+    // Example: swap to 'Secret_santa_V2.html' after you finish editing that file.
     const filePath = path.join(__dirname, 'Secret_santa_V1.html');
     const stream = fs.createReadStream(filePath);
     res.writeHead(200, {
