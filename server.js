@@ -6,6 +6,18 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
+const STATIC_DIRS = Object.freeze({
+  assets: path.join(__dirname, 'assets')
+});
+const STATIC_MIME_TYPES = new Map([
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.gif', 'image/gif'],
+  ['.webp', 'image/webp'],
+  ['.mp3', 'audio/mpeg']
+]);
 
 // ====== 1) EDIT THESE NAMES ======
 const PARTICIPANTS = [
@@ -157,6 +169,11 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (method === 'GET') {
+    const served = await tryServeStaticAsset(pathname, res);
+    if (served) return;
+  }
+
   sendNotFound(res);
 }
 
@@ -272,6 +289,8 @@ function normalizeState(rawState) {
 
 async function serveHtml(res) {
   try {
+    // === Need to serve a different HTML version? Update the filename below. ===
+    // Example: swap to 'Secret_santa_V2.html' after you finish editing that file.
     const filePath = path.join(__dirname, 'Secret_santa_V1.html');
     const stream = fs.createReadStream(filePath);
     res.writeHead(200, {
@@ -291,6 +310,55 @@ async function serveHtml(res) {
     console.error('Error serving HTML file', err);
     sendJson(res, 500, { error: 'Could not serve HTML file.' });
   }
+}
+
+async function tryServeStaticAsset(pathname, res) {
+  const trimmed = pathname.replace(/^\/+/, '');
+  if (!trimmed) return false;
+  const parts = trimmed.split('/');
+  if (parts.length < 2) return false;
+  const bucket = parts.shift();
+  const baseDir = STATIC_DIRS[bucket];
+  if (!baseDir) return false;
+  const relativePath = parts.join(path.sep);
+  if (!relativePath) return false;
+
+  const ext = path.extname(relativePath).toLowerCase();
+  const mime = STATIC_MIME_TYPES.get(ext);
+  if (!mime) return false;
+
+  const filePath = path.join(baseDir, relativePath);
+  if (!filePath.startsWith(baseDir)) {
+    return false;
+  }
+
+  try {
+    await fsp.access(filePath, fs.constants.R_OK);
+  } catch (err) {
+    if (err && err.code === 'ENOENT') {
+      return false;
+    }
+    console.error('Failed to access static asset', err);
+    if (!res.headersSent) {
+      sendJson(res, 500, { error: 'Could not read asset.' });
+    } else {
+      res.end();
+    }
+    return true;
+  }
+
+  const stream = fs.createReadStream(filePath);
+  res.writeHead(200, {
+    'Content-Type': mime,
+    'Cache-Control': 'public, max-age=86400',
+    'Access-Control-Allow-Origin': '*'
+  });
+  stream.on('error', (err) => {
+    console.error('Failed while streaming asset', err);
+    res.destroy(err);
+  });
+  stream.pipe(res);
+  return true;
 }
 
 function sendOptions(res) {
